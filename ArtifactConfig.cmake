@@ -30,6 +30,20 @@ endfunction()
 # PATH (exposing probe-rs, cargo-flash, cargo-embed together). No
 # CMAKE_TOOLCHAIN_FILE is set and no companion .cmake file is required.
 #
+# NOTE: set(ENV{PATH} ...) below only affects the running CMake configure
+# process. It does NOT reach commands added via add_custom_target/
+# add_custom_command, since those run later as a separate build-tool
+# process (ninja/make) that does not inherit configure-time ENV changes.
+# For that reason this function also exports the resolved absolute
+# executable path as the CACHE variable PROBE_RS_EXECUTABLE – use that
+# (not a bare "probe-rs") inside any COMMAND that runs at build time, e.g.:
+#
+#   add_custom_target(flash
+#       COMMAND ${PROBE_RS_EXECUTABLE} download --chip ... $<TARGET_FILE:${PROJECT_NAME}>
+#       COMMAND ${PROBE_RS_EXECUTABLE} reset --chip ...
+#       DEPENDS ${PROJECT_NAME}
+#       USES_TERMINAL)
+#
 # ARTIFACT_BIN_PATH_ARG [in]: Path to the binary part of artifact
 #------------------------------------------------------------------------------#
 function(probe-rs_ArtifactInit ARTIFACT_BIN_PATH_ARG)
@@ -41,6 +55,7 @@ function(probe-rs_ArtifactInit ARTIFACT_BIN_PATH_ARG)
         foreach(FILE_PATH IN LISTS ALL_CONFIG_FILES)
             if(FILE_PATH MATCHES "probe-rs.exe")
                 get_filename_component(CONFIG_DIR ${FILE_PATH} DIRECTORY)
+                set(RESOLVED_EXECUTABLE "${FILE_PATH}")
                 break()
             endif()
         endforeach()
@@ -66,6 +81,7 @@ function(probe-rs_ArtifactInit ARTIFACT_BIN_PATH_ARG)
         foreach(FILE_PATH IN LISTS ALL_CONFIG_FILES)
             if(FILE_PATH MATCHES "probe-rs$")
                 get_filename_component(CONFIG_DIR ${FILE_PATH} DIRECTORY)
+                set(RESOLVED_EXECUTABLE "${FILE_PATH}")
                 break()
             endif()
         endforeach()
@@ -86,6 +102,9 @@ function(probe-rs_ArtifactInit ARTIFACT_BIN_PATH_ARG)
 
     endif()
 
+    set(PROBE_RS_EXECUTABLE "${RESOLVED_EXECUTABLE}" CACHE FILEPATH "Absolute path to the resolved probe-rs executable" FORCE)
+
     message(DEBUG "probe-rs was added to PATH from: ${CONFIG_DIR}")
+    message(DEBUG "PROBE_RS_EXECUTABLE set to: ${PROBE_RS_EXECUTABLE}")
 
 endfunction()
